@@ -17,7 +17,7 @@ USERS = "/usr/share/wordlists/users.txt"
 
 
 def test_hydra_needs_install(h):
-    assert "sudo apt install hydra" in h.run("hydra -l admin -P x www.foo.corp ssh")
+    assert "sudo apt install hydra" in h.run("hydra -l admin -P x intra.foo.corp ssh")
 
 
 def test_install_brings_wordlists(h):

@@ -57,7 +57,7 @@ def test_tutorial_flow(h):
     h.run("scrub")
     assert h.game.world.nodes[SANDBOX].footprint == 0
     h.run("exit")
-    out = h.run("echo here | mail -s T0 -A ~/downloads/training_payload.dat vex@blackrelay.net")
+    out = h.run("echo here | mail -A ~/downloads/training_payload.dat vex@blackrelay.net")
     assert "1 attachment" in out, out
     t0 = next(c for c in h.state.contracts if c.id == "T0")
     assert t0.status == "done"
@@ -113,6 +113,44 @@ def test_tutorial_follow(h):
     assert "needs a terminal" in h.run("tutorial -f | cat")
 
 
+def test_contracts_follow(h):
+    for c in h.state.contracts:
+        c.min_rating = 0
+    job = next(c for c in h.state.contracts if c.status == "open" and c.kind == "retrieve")
+    h.game.accept(job)
+    node = h.game.world.nodes[job.target]
+
+
+    async def go():
+        task = asyncio.ensure_future(h.shell.run_line("contracts -f"))
+        await asyncio.sleep(0.05)
+        assert h.ui.watching
+        assert "T0  TRAINING" in h.ui.text and f"{job.id}  RETRIEVE" in h.ui.text
+        assert f"scp {job.path.rsplit('/', 1)[1]} gateway:~/downloads/" in h.ui.text
+        first = node.parent or job.target
+        assert f"[>] Break the ICE:  breach {h.game.world.ref(h.game.world.nodes[first])}" \
+            in h.ui.text
+        # opening the ICE ticks the step off and redraws the panel
+        h.game.world.nodes[first].breached_until = h.game.now + 120
+        await asyncio.sleep(0.4)
+        assert "[x] ICE down on" in h.ui.text
+        assert h.ui.text.count(f"{job.id}  RETRIEVE") == 1   # redrawn, not appended
+        # a finished job stays on the panel as DONE
+        h.game.complete(job)
+        await asyncio.sleep(0.4)
+        assert f"{job.id}  DONE" in h.ui.text
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    asyncio.run(go())
+    assert not h.ui.watching
+    assert "needs a terminal" in h.run("contracts -f | cat")
+    out = h.run("contracts T0")
+    assert "Progress:" in out and "[>] Break the ICE:  breach sandbox" in out
+
+
 def test_old_save_tutorial_step_migrates(h):
     from nullroute.game.state import migrate
     h.state.tutorial_step = 3
@@ -141,3 +179,24 @@ def test_contracts_generated_and_acceptable(h):
     msg = h.game.accept(c)
     assert "accepted" in msg
     assert c.id in h.run("ls contracts")
+
+
+def test_mail_completion(h):
+    for c in h.state.contracts:
+        c.min_rating = 0
+    job = next(c for c in h.state.contracts if c.status == "open")
+    h.game.accept(job)
+    sh = h.shell
+    # addresses: active clients plus Vex, also after a pipe
+    _, cands = sh.complete("mail -s T0 ")
+    assert sorted(cands) == sorted([job.client_addr, "vex@blackrelay.net"])
+    assert sh.complete("mail vex")[0] == "mail vex@blackrelay.net "
+    assert sh.complete("echo done | mail -s x vex")[0] == "echo done | mail -s x vex@blackrelay.net "
+    assert sh.complete(f"mail {job.client_addr[:3]}")[0] == f"mail {job.client_addr} "
+    # subject after -s: contract ids
+    assert sh.complete(f"mail -s {job.id[:2]}")[0] == f"mail -s {job.id} "
+    # -A still completes files
+    new, _ = sh.complete("mail -s T0 -A REA")
+    assert new == "mail -s T0 -A README.txt "
+    # commands complete after a pipe too
+    assert sh.complete("ls | gre")[0] == "ls | grep "

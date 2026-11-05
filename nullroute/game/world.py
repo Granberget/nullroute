@@ -42,6 +42,12 @@ class World:
             return matches[0]
         return None
 
+    def ref(self, node: Node) -> str:
+        """Shortest name that resolve() maps back to this node."""
+        if sum(1 for n in self.nodes.values() if n.short == node.short) == 1:
+            return node.short
+        return node.hostname
+
     def new_ip(self) -> str:
         while True:
             ip = ".".join(str(x) for x in (
@@ -238,10 +244,10 @@ def _corp(w: World, sec: int, city: str, now: float, used: set[str]) -> Corp:
     corp.staff = [w.person() for _ in range(5)]
     loc = w.loc(city)
 
-    front = w.add(Node(f"www.{domain}", w.new_ip(), "front", max(1, sec - 1),
-                       domain, f"{name} front node", loc))
+    front = w.add(Node(f"intra.{domain}", w.new_ip(), "front", max(1, sec - 1),
+                       domain, f"{name} staff intranet", loc))
     front.layers = _ice(front.sec, core=False)
-    front.motd = f"{name} - public node. Unauthorised access is monitored.\n"
+    front.motd = f"{name} intranet - staff only. Unauthorised access is monitored.\n"
     core = w.add(Node(f"core.{domain}", w.new_ip(), "core", sec, domain,
                       f"{name} core node", loc))
     core.layers = _ice(sec, core=True)
@@ -249,11 +255,11 @@ def _corp(w: World, sec: int, city: str, now: float, used: set[str]) -> Corp:
     core.motd = f"{name} CORE. Internal systems. All sessions are recorded.\n"
     corp.nodes = [front.hostname, core.hostname]
 
-    # front node: public-ish content and a pointer to the core
+    # front node (staff intranet): web content and a pointer to the core
     fs = base_fs(front, now)
     front.fs = fs
     fs.put("/var/www/index.html",
-           f"<html><h1>{name}</h1><p>Building tomorrow, today.</p></html>\n")
+           f"<html><h1>{name}</h1><p>Staff intranet. Building tomorrow, today.</p></html>\n")
     fs.put("/etc/hosts", f"{front.ip}\t{front.hostname}\n"
                          f"{core.ip}\t{core.hostname}   # core - reachable from this node only\n")
     for i in range(3):

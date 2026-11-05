@@ -47,8 +47,8 @@ what you are missing.
 After a successful breach the node stays open for about two hours of game
 time (two real minutes), so connect right away.
 
-**Core nodes** only accept connections from their corporation's front
-node (`www.<corp>`). Breach and `ssh` into the front node first, then run
+**Core nodes** only accept connections from their corporation's intranet
+node (`intra.<corp>`). Breach and `ssh` into the intranet node first, then run
 `breach core.<corp>` and `ssh core.<corp>` from there.
 """,
     "Trace and routes": """\
@@ -94,7 +94,7 @@ at a service until one of them logs in, then saves what it found to
 That also drops wordlists into `/usr/share/wordlists/` (`common.txt`,
 `users.txt`). Then point it at a target:
 
-    hydra -l admin -P /usr/share/wordlists/common.txt www.acme.corp ssh
+    hydra -l admin -P /usr/share/wordlists/common.txt intra.acme.corp ssh
     hydra -L /usr/share/wordlists/users.txt -P /usr/share/wordlists/common.txt ssh://core.acme.corp
 
 * `-l USER` tries one login; `-L FILE` tries a whole list of logins.
@@ -124,8 +124,8 @@ a small list may miss. Higher hydra versions add more service modules
 The client's address is in the briefing. Mail is sent from your gateway:
 
     scp report.dat gateway:~/downloads/                (on the node)
-    mail -s C012 -A ~/downloads/report.dat ADDRESS     (on your gateway)
-    echo done | mail -s 'C012 done' ADDRESS            (a confirmation)
+    mail -A ~/downloads/report.dat ADDRESS             (on your gateway)
+    echo done | mail ADDRESS                           (a confirmation)
 
 If the job isn't actually done the client writes back and tells you so.
 Plant contracts complete by themselves. Higher security pays more but
@@ -203,6 +203,7 @@ This game runs a real-ish Linux shell, so you can learn a lot by playing.
 | `probe`, `breach`, `hydra`, `scrub` | runner tools |
 | `route`, `map` | bounce route and network map |
 | `mail`, `contracts`, `status` | your stuff |
+| `contracts -f` | live job checklist - run it in a second terminal (Ctrl+N) |
 | `sleep 2h` | let time pass (on your gateway) |
 
 Pipes and redirects work: `grep -r vault /home | head -3 > notes.txt`.

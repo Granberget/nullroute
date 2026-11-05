@@ -42,7 +42,7 @@ KIND_LABEL = {
     "agency": "Agency BBS",
     "drop": "Agency drop",
     "sandbox": "Training node",
-    "front": "Corporate front node",
+    "front": "Corporate intranet node",
     "core": "Corporate core node",
 }
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import difflib
+import re
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Protocol
 
@@ -511,12 +512,14 @@ class Shell:
         """Complete the last word of text. Returns (new_text, candidates)."""
         head, sep, word = text.rpartition(" ")
         prefix = head + sep
-        first = not head.strip() or head.strip() in ("sudo", "man", "which")
+        # only the last command of a pipeline / list matters: 'echo x | mail ...'
+        seg = re.split(r"\|\||&&|[|;]", head)[-1]
+        first = not seg.strip() or seg.strip() in ("sudo", "man", "which")
         if first:
             names = sorted(set(self.commands) | set(self.aliases))
             cands = [n for n in names if n.startswith(word)]
             return self._apply(prefix, word, cands, " ")
-        parts = head.split()
+        parts = seg.split()
         cmd = parts[1] if parts and parts[0] == "sudo" and len(parts) > 1 else (parts[0] if parts else "")
         hostish = cmd in ("ssh", "breach", "probe", "hydra", "ping", "traceroute", "host",
                           "nslookup", "dig") or (cmd == "route" and len(parts) >= 2)
@@ -525,6 +528,18 @@ class Shell:
             from ..game import packages
             cands = [p for p in sorted(packages.PACKAGES) if p.startswith(word)]
             return self._apply(prefix, word, cands, " ")
+        if cmd == "mail" and len(parts) >= 1:
+            prev = parts[-1] if len(parts) > 1 else ""
+            active = [c for c in self.game.state.contracts if c.status == "accepted"]
+            if prev == "-s":
+                # subject: the contract id is what clients look for
+                cands = [c.id for c in active if c.id.lower().startswith(word.lower())]
+                return self._apply(prefix, word, cands, " ")
+            if prev not in ("-A", "-a", "--attach") and not word.startswith(("-", "~", "/", ".")):
+                addrs = [c.client_addr for c in active if c.client_addr]
+                addrs.append("vex@blackrelay.net")
+                cands = [a for a in dict.fromkeys(addrs) if a.startswith(word)]
+                return self._apply(prefix, word, cands, " ")
         if hostish:
             known = sorted(self.game.state.known)
             cands = [h for h in known if h.startswith(word)]

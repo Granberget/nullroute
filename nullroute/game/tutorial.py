@@ -67,9 +67,9 @@ STEPS: list[Step] = [
          _flag("home_after_scrub")),
     Step("Mail it to Vex",
          "Clients want their files by mail. Attach it with -A:\n"
-         "  mail -s T0 -A ~/downloads/training_payload.dat vex@blackrelay.net\n"
+         "  mail -A ~/downloads/training_payload.dat vex@blackrelay.net\n"
          "Type a line of text if you like, then a single '.' to send.\n"
-         "(or pipe the text in:  echo here | mail -s T0 -A ... vex@blackrelay.net)",
+         "(or pipe the text in:  echo here | mail -A ... vex@blackrelay.net)",
          _flag("contract:T0")),
     Step("Buy your first upgrade",
          "Corp nodes above the easiest tier have CIPHER layers, and you need\n"

@@ -134,7 +134,7 @@ class Game:
             else:
                 self.mail(sender, f"Re: {subject}",
                           "There was no attachment. Attach the file with -A:\n"
-                          f"  mail -s '{c.id}' -A ~/downloads/FILE {c.client_addr}")
+                          f"  mail -A ~/downloads/FILE {c.client_addr}")
             return
         if c.kind == "find":
             if c.answer.lower() in text:
@@ -340,7 +340,9 @@ class Game:
         self.mail("Blackrelay Contracts <board@blackrelay.net>",
                   f"Contract {c.id} accepted", f"{c.title}\n\n{brief}\n\n"
                   f"Deadline: {fmt_short(c.deadline)}\nPay: ¢{c.pay:,}\n"
-                  f"(A copy is in ~/contracts/{c.id}.txt)")
+                  f"(A copy is in ~/contracts/{c.id}.txt)\n\n"
+                  "Tip: Ctrl+N opens a second terminal - run  contracts -f  there\n"
+                  "for a live checklist of this job while you work.")
         return f"Contract {c.id} accepted. Briefing saved to ~/contracts/{c.id}.txt"
 
     def abandon(self, c: C.Contract) -> str:

@@ -180,7 +180,7 @@ sudo nano /etc/hosts
     "ssh": """
 ssh blackrelay.net
     open the agency BBS
-ssh www.acme.corp
+ssh intra.acme.corp
     log in to a breached node (follows your route)
 exit
     close the connection again
@@ -190,7 +190,7 @@ scp file.dat drop.blackrelay.net:/drop/C001/
     upload to the drop box
 scp gateway:~/contracts/C002/x.dat /data/
     pull a file from your gateway (run on the target)
-scp -r www.acme.corp:/data/projects ~/downloads/
+scp -r intra.acme.corp:/data/projects ~/downloads/
     copy a whole directory home
 """,
     "sudo": """
@@ -266,9 +266,9 @@ sudo apt remove sl
     "nmap": """
 nmap osaka.relay
     which ports are open
-nmap -sV www.acme.corp
+nmap -sV intra.acme.corp
     ...and which software answers on them
-nmap -p 22,80,443 www.acme.corp
+nmap -p 22,80,443 intra.acme.corp
     only check these ports
 nmap -sn osaka.relay tallinn.relay
     just: are these hosts up?
@@ -276,9 +276,9 @@ nmap -sn osaka.relay tallinn.relay
     "mail": """
 mail
     open your inbox (r reply, c compose)
-echo 'all done' | mail -s 'C012 done' client@quietmail.net
+echo 'all done' | mail client@quietmail.net
     send a short mail
-mail -s C012 -A ~/downloads/report.dat client@quietmail.net
+mail -A ~/downloads/report.dat client@quietmail.net
     send a file as an attachment (type the text, end with a '.' line)
 """,
     "split": """
@@ -378,7 +378,7 @@ sudo !!
     ...as root
 """,
     "breach": """
-breach www.acme.corp
+breach intra.acme.corp
     run your breach programs against the node's ICE
 """,
     "probe": """
@@ -386,13 +386,13 @@ probe core.acme.corp
     what protects this node, and can I break it?
 """,
     "hydra": """
-hydra -l admin -P /usr/share/wordlists/common.txt www.acme.corp ssh
+hydra -l admin -P /usr/share/wordlists/common.txt intra.acme.corp ssh
     try the login 'admin' against ssh with a whole password list
-hydra -L /usr/share/wordlists/users.txt -P /usr/share/wordlists/common.txt ssh://www.acme.corp
+hydra -L /usr/share/wordlists/users.txt -P /usr/share/wordlists/common.txt ssh://intra.acme.corp
     try many logins too (service://host form)
-hydra -l root -p hunter2 www.acme.corp ssh
+hydra -l root -p hunter2 intra.acme.corp ssh
     try a single login/password guess
-hydra -f -L users.txt -P common.txt www.acme.corp ssh
+hydra -f -L users.txt -P common.txt intra.acme.corp ssh
     stop at the first login that works
     (breach the node first - a filtered port can't be brute-forced)
 """,

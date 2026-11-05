@@ -8,7 +8,7 @@ import posixpath
 import random
 import re
 
-from ..game import clock, store, tutorial
+from ..game import clock, jobs, store, tutorial
 from ..game.engine import Conn
 from ..game.hosts import LAYER_DESC
 from ..game.state import save as save_state
@@ -993,7 +993,7 @@ async def c_ssh(ctx: Ctx) -> int:
         ctx.err(f"{DROP} accepts uploads only. Use scp.")
         return 255
     if node.kind == "relay":
-        ctx.err(f"{node.hostname} only forwards traffic. Add it to your route: route add {node.short}")
+        ctx.err(f"{node.hostname} only forwards traffic. Add it to your route: route add {ctx.game.world.ref(node)}")
         return 255
     if node.kind == "gateway":
         ctx.err("That's your own gateway. Use 'exit' to go back.")
@@ -1010,7 +1010,7 @@ async def c_ssh(ctx: Ctx) -> int:
     if not node.is_open(ctx.game.now):
         layer = node.layers[0].kind.upper()
         ctx.err(f"connect to {node.hostname} port 22: Connection refused by ICE ({layer})")
-        ctx.write(f"  Breach it first: breach {node.short}", "dim")
+        ctx.write(f"  Breach it first: breach {ctx.game.world.ref(node)}", "dim")
         return 255
     hops = len(path) - 2
     ctx.write(f"Routing via {hops} hop{'s' if hops != 1 else ''}: "
@@ -1040,7 +1040,7 @@ def _spec(arg: str) -> tuple[str | None, str]:
      "Either side may be host:path. Examples:\n"
      f"  scp report.dat {DROP}:/drop/C001/     upload to the drop box\n"
      "  scp gateway:~/contracts/C002/x.dat /data/   (run on the target)\n"
-     "  scp www.acme.corp:/data/x.dat ~/downloads/   (run on your gateway)\n"
+     "  scp intra.acme.corp:/data/x.dat ~/downloads/   (run on your gateway)\n"
      "Transfers take time depending on your network hardware.", group="network")
 async def c_scp(ctx: Ctx) -> int:
     flags, args = split_flags(ctx.args, "rpqvC")
@@ -1240,7 +1240,7 @@ async def c_probe(ctx: Ctx) -> int:
             total += secs
             ctx.write(f"    {desc}  strength {strength}   ✓ {prog} v{ver} (~{secs:.0f}s)", "good")
     if ok:
-        ctx.write(f"  Breach time: ~{total:.0f}s.  Run: breach {node.short}", "good")
+        ctx.write(f"  Breach time: ~{total:.0f}s.  Run: breach {ctx.game.world.ref(node)}", "good")
     else:
         ctx.write("  You can't breach this yet. Upgrade at the agency store.", "warn")
     if node.is_open(ctx.game.now):
@@ -1266,7 +1266,7 @@ async def c_breach(ctx: Ctx) -> int:
         ctx.write(f"{node.hostname} has no ICE.")
         return 0
     if node.is_open(ctx.game.now):
-        ctx.write(f"{node.hostname} is already open. ssh {node.short}")
+        ctx.write(f"{node.hostname} is already open. ssh {ctx.game.world.ref(node)}")
         return 0
     plan = ctx.game.breach_plan(node)
     missing = [(k, st) for k, st, v, secs in plan if secs < 0]
@@ -1287,7 +1287,7 @@ async def c_breach(ctx: Ctx) -> int:
     finally:
         ctx.game.close_conn(conn)
     ctx.game.breached(node, len(path) - 2)
-    ctx.write(f"ICE down. {node.hostname} is open - connect with: ssh {node.short}", "good")
+    ctx.write(f"ICE down. {node.hostname} is open - connect with: ssh {ctx.game.world.ref(node)}", "good")
     return 0
 
 
@@ -1364,7 +1364,7 @@ def _hydra_list(ctx: Ctx, single: str | None, path: str | None, what: str) -> li
      "  -t N                parallel tasks (default by hydra version)\n"
      "  -f                  stop at the first login found\n"
      "  -o FILE             also write the result to FILE\n"
-     "Give the target as  www.acme.corp ssh  or  ssh://www.acme.corp.\n"
+     "Give the target as  intra.acme.corp ssh  or  ssh://intra.acme.corp.\n"
      "Wordlists live in /usr/share/wordlists/ (common.txt, users.txt).\n\n"
      "It is as loud as a breach: the node starts tracing you and you leave a\n"
      "footprint, so route through relays and scrub afterwards. The port must be\n"
@@ -1411,7 +1411,7 @@ async def c_hydra(ctx: Ctx) -> int:
             service = plain[1]
     if target is None:
         ctx.write("Syntax: hydra [-l USER|-L FILE] [-p PASS|-P FILE] TARGET SERVICE", None)
-        ctx.write("Example: hydra -l admin -P /usr/share/wordlists/common.txt www.acme.corp ssh")
+        ctx.write("Example: hydra -l admin -P /usr/share/wordlists/common.txt intra.acme.corp ssh")
         return 1
     if ":" in target and port_arg is None:
         target, _, port_arg = target.partition(":")
@@ -1469,7 +1469,7 @@ async def c_hydra(ctx: Ctx) -> int:
     if not node.is_open(ctx.game.now):
         ctx.write(f"[ERROR] could not connect to {service}://{node.hostname}:{port} - "
                   "Connection refused", "error")
-        ctx.write(f"  The port is filtered by live ICE. Breach it first: breach {node.short}", "dim")
+        ctx.write(f"  The port is filtered by live ICE. Breach it first: breach {ctx.game.world.ref(node)}", "dim")
         return 1
 
     logins = _hydra_list(ctx, login, login_file, "logins")
@@ -1534,7 +1534,7 @@ async def c_hydra(ctx: Ctx) -> int:
         lootdir = f"{ctx.game.state.home}/loot"
         d = gw.mkdir_p(lootdir, mtime=ctx.game.now)
         d.owner = d.group = ctx.game.state.handle
-        lootpath = f"{lootdir}/{node.short}.txt"
+        lootpath = f"{lootdir}/{ctx.game.world.ref(node)}.txt"
         existing = gw.get(lootpath)
         if existing is not None and not existing.is_dir:
             existing.content += block
@@ -1542,7 +1542,7 @@ async def c_hydra(ctx: Ctx) -> int:
         else:
             f = gw.put(lootpath, block, mtime=ctx.game.now)
             f.owner = f.group = ctx.game.state.handle
-        ctx.write(f"  Credentials saved to ~/loot/{node.short}.txt", "good")
+        ctx.write(f"  Credentials saved to ~/loot/{ctx.game.world.ref(node)}.txt", "good")
         if outfile:
             try:
                 parent, name = ctx.parent_for_write(outfile)
@@ -1586,13 +1586,13 @@ async def c_map(ctx: Ctx) -> int:
     return 0
 
 
-@cmd("mail", "read your inbox, or send mail", "mail | mail -s SUBJECT [-A FILE] ADDRESS...",
+@cmd("mail", "read your inbox, or send mail", "mail | mail [-s SUBJECT] [-A FILE] ADDRESS...",
      "Without arguments: opens your inbox (r replies, c composes a new mail).\n"
-     "With -s it sends a mail, like the classic mailx:\n"
-     "  -s SUBJECT   the subject (quote it if it has spaces)\n"
+     "With an address it sends a mail, like the classic mailx:\n"
+     "  -s SUBJECT   a subject (optional - clients go by the address)\n"
      "  -A FILE      attach a file from your gateway (repeat for more)\n"
      "The message body is read from standard input, so pipe it in:\n"
-     "  echo 'all done' | mail -s 'C012 done' client@quietmail.net\n"
+     "  echo 'all done' | mail client@quietmail.net\n"
      "or type it after the command and end with a line containing only '.'\n"
      "(or Ctrl+D). Mail can only be sent from your gateway.", group="game")
 async def c_mail(ctx: Ctx) -> int:
@@ -1651,8 +1651,6 @@ async def c_mail(ctx: Ctx) -> int:
         body = "\n".join(lines) + ("\n" if lines else "")
     if not body.strip():
         ctx.write("Null message body; hope that's ok", "dim")
-    if not subject:
-        ctx.write("(no subject)", "dim")
     ctx.game.send_mail(to, subject, body, files)
     ctx.write(f"mail: sent to {', '.join(to)}"
               + (f" with {len(files)} attachment{'s' if len(files) != 1 else ''}" if files else ""),
@@ -1660,27 +1658,73 @@ async def c_mail(ctx: Ctx) -> int:
     return 0
 
 
-@cmd("contracts", "list your accepted contracts", "contracts [id]", group="game")
+@cmd("contracts", "list your accepted contracts", "contracts [-f] [id]",
+     "Without arguments: your active contracts, one per line.\n"
+     "contracts ID   the full briefing plus a checklist of how far you are.\n"
+     "-f   follow: a live panel with every active contract - what to do next,\n"
+     "     time left, files to fetch, commands to copy and a trace warning.\n"
+     "     It ticks itself off while you work. Best in a terminal of its own:\n"
+     "     press Ctrl+N and run 'contracts -f' there. Ctrl+C stops it.\n"
+     "     'contracts -f ID' follows a single contract.", group="game")
 async def c_contracts(ctx: Ctx) -> int:
     s = ctx.game.state
-    if ctx.args:
-        c = next((c for c in s.contracts if c.id.lower() == ctx.args[0].lower()), None)
+    args = [a for a in ctx.args if a not in ("-f", "--follow")]
+    if len(args) != len(ctx.args):
+        return await _contracts_follow(ctx, args[0] if args else None)
+    if args:
+        c = next((c for c in s.contracts if c.id.lower() == args[0].lower()), None)
         if not c or c.status == "open":
-            ctx.err(f"no accepted contract {ctx.args[0]}")
+            ctx.err(f"no accepted contract {args[0]}")
             return 1
         ctx.write(f"{c.id} - {c.title}  [{c.status}]", "title")
         ctx.write(f"Pay ¢{c.pay:,}   Deadline {clock.fmt_short(c.deadline)}")
         ctx.write(c.brief)
+        if c.status == "accepted":
+            ctx.write("")
+            ctx.write("Progress:", "title")
+            for mark, text in jobs.checklist(ctx.game, c):
+                ctx.write(f"  {mark} {text}", {"[x]": "dim", "[!]": "warn"}.get(mark))
         return 0
-    mine = [c for c in s.contracts if c.status == "accepted"]
+    mine = jobs.active(ctx.game)
     if not mine:
         ctx.write(f"No active contracts. Find work at the agency: ssh {AGENCY}")
         return 0
     for c in mine:
         left = clock.fmt_duration(c.deadline - ctx.game.now)
         ctx.write(f"  {c.id:<6} {c.label:<9} ¢{c.pay:>7,}  {left:>7} left  {c.title}")
-    ctx.write("\n'contracts <id>' shows the briefing.", "dim")
+    ctx.write("\n'contracts <id>' shows the briefing. Ctrl+N, then 'contracts -f'\n"
+              "in the new terminal keeps a live checklist on screen.", "dim")
     return 0
+
+
+async def _contracts_follow(ctx: Ctx, only: str | None) -> int:
+    """'contracts -f': a live panel, redrawn whenever something changes."""
+    if ctx.piped or ctx.background:
+        ctx.err("-f needs a terminal of its own (Ctrl+N opens one)")
+        return 1
+    ui = ctx.ui
+    ui.watching = True
+    ctx.game.flag("contracts_follow")
+    seen: set[str] = set()
+    finished: list = []
+    shown = None
+    try:
+        while True:
+            s = ctx.game.state
+            for c in s.contracts:
+                if c.status == "accepted":
+                    seen.add(c.id)
+                elif c.id in seen and c.status in ("done", "failed") and c not in finished:
+                    finished.append(c)
+            lines = jobs.render(ctx.game, only, finished[-3:])
+            if lines != shown:
+                shown = lines
+                ui.clear()
+                for text, style in lines:
+                    ctx.write(text, style)
+            await asyncio.sleep(0.25)
+    finally:
+        ui.watching = False
 
 
 @cmd("tutorial", "show the current tutorial objective", "tutorial [-f | skip]",

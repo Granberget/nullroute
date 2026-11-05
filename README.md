@@ -88,6 +88,7 @@ nullroute
 |-------|------|
 | Start menu | ↑/↓ choose, Enter select, Esc back. "Reset a password" sets a new sudo password for a save |
 | Terminal | PgUp/PgDn or Shift+↑/↓ scroll, Ctrl+Home/End top/bottom, ↑/↓ history, Ctrl+L clear |
+| Copy/paste | Drag with the mouse to select text, **Ctrl+Shift+C** copies it (Ctrl+C too, while text is selected). **Right-click** pastes at the prompt |
 | Terminals | **Ctrl+N** (or `split`) new terminal, up to four side by side. **Alt+←/→** or **F2** switch, Alt+1..4 jump |
 | Closing | `exit`, `logout` or Ctrl+D on your gateway closes a terminal. Closing the last one asks first, then logs out to the start menu |
 | nano | `^O` write out, `^X` exit, `^W` search, `^\` replace, `^K`/`^U` cut/paste line, `^C` position, `^_` go to line, `^G` help, `M-U`/`M-E` undo/redo (`^` = Ctrl, `M-` = Alt) |
@@ -101,6 +102,8 @@ in `~/.nullroute/` (Windows: `%USERPROFILE%\.nullroute\`).
 ### The loop
 
 1. Accept a contract on the BBS. The briefing lands in `~/contracts/`.
+   Tip: Ctrl+N and `contracts -f` in the new terminal gives a live checklist
+   of every active job (next step, time left, commands to copy, trace).
 2. `probe <node>` shows the ICE layers and whether your programs can break them.
 3. `route add <relay>` adds a bounce hop. More hops means a slower trace.
 4. `breach <node>`: **the trace starts now.**
@@ -108,12 +111,12 @@ in `~/.nullroute/` (Windows: `%USERPROFILE%\.nullroute\`).
 6. `scrub` removes your footprint, then `exit`.
 7. Report back by mail from your gateway.
 
-Core nodes (`core.<corp>`) only accept connections from their front node
-(`www.<corp>`). Breach and ssh into the front node first.
+Core nodes (`core.<corp>`) only accept connections from their intranet
+node (`intra.<corp>`). Breach and ssh into the intranet node first.
 
 | Contract | What you do |
 |----------|-------------|
-| Retrieve | `scp` a file home, then `mail -s ID -A ~/downloads/FILE client@...` |
+| Retrieve | `scp` a file home, then `mail -A ~/downloads/FILE client@...` |
 | Wipe     | `rm` a file (and its backups), then mail the client to confirm |
 | Modify   | Change one value in a CSV register (`nano`), then mail to confirm |
 | Plant    | `scp gateway:~/contracts/<id>/<file> <dir>/` on the target |

@@ -73,7 +73,7 @@ def training_contract(now: float) -> Contract:
             "Goal:    find training_payload.dat somewhere under /data, copy it\n"
             "         home to your gateway and mail it to Vex:\n"
             "           scp training_payload.dat gateway:~/downloads/     (on the node)\n"
-            "           mail -s T0 -A ~/downloads/training_payload.dat vex@blackrelay.net\n"
+            "           mail -A ~/downloads/training_payload.dat vex@blackrelay.net\n"
             "                                                    (back on your gateway)\n\n"
             "Steps:   probe the node, set up a route through a couple of\n"
             "         relays, breach it, ssh in, find the file, copy it home,\n"
@@ -87,7 +87,7 @@ def training_contract(now: float) -> Contract:
 
 def _confirm_text(c: Contract) -> str:
     return (f"When it's done, confirm by mail:\n"
-            f"  echo done | mail -s '{c.id} done' {c.client_addr}")
+            f"  echo done | mail {c.client_addr}")
 
 
 def ensure_registry(node, rng, corp, now: float) -> File:
@@ -160,7 +160,7 @@ def generate(state, now: float) -> Contract | None:
                            "Copy the file to your gateway, then mail it to the client\n"
                            "as an attachment:\n"
                            f"  scp {f.name} gateway:~/downloads/          (on the node)\n"
-                           f"  mail -s '{cid}' -A ~/downloads/{f.name} {addr}\n"
+                           f"  mail -A ~/downloads/{f.name} {addr}\n"
                            "                                           (on your gateway)")
             else:
                 c.title = f"Wipe {f.name} at {corp.name}"
@@ -231,7 +231,7 @@ def generate(state, now: float) -> Contract | None:
                        "Somebody on that node wrote down the vault passphrase.\n"
                        "It looks like:  word-word-NN\n"
                        "Send it to the client by mail (or submit it on this board):\n"
-                       f"  echo PASSPHRASE | mail -s '{cid}' {addr}\n\n"
+                       f"  echo PASSPHRASE | mail {addr}\n\n"
                        "Tip: hidden files start with a dot (ls -a), and\n"
                        "     grep -r passphrase /home  searches everything.")
         return c

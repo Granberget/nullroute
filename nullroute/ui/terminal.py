@@ -11,6 +11,8 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
+from textual.selection import Selection
+from textual.strip import Strip
 from textual.widgets import Input, Label, RichLog, Static
 
 from ..game import clock, state as S, tutorial
@@ -54,12 +56,43 @@ class TermLog(RichLog):
         self.refresh(layout=True)
         return result
 
+    # -- mouse selection (RichLog has none built in) -------------------
+    ALLOW_SELECT = True
+
+    def get_selection(self, selection: Selection) -> tuple[str, str] | None:
+        text = "\n".join(strip.text.rstrip() for strip in self.lines)
+        return selection.extract(text), "\n"
+
+    def selection_updated(self, selection: Selection | None) -> None:
+        self._line_cache.clear()
+        self.refresh()
+
+    def render_line(self, y: int) -> Strip:
+        scroll_x, scroll_y = self.scroll_offset
+        line_y = scroll_y + y
+        width = self.scrollable_content_region.width
+        line = self._render_line(line_y, scroll_x, width)
+        selection = self.text_selection
+        if selection is not None and line_y < len(self.lines):
+            span = selection.get_span(line_y)
+            if span is not None:
+                start, end = span
+                if end == -1:
+                    end = line.cell_length
+                sel_style = self.screen.get_component_rich_style("screen--selection")
+                line = Strip.join([line.crop(0, start),
+                                   line.crop(start, end).apply_style(sel_style),
+                                   line.crop(end)])
+        # offsets tell the screen which character the mouse is over
+        return line.apply_style(self.rich_style).apply_offsets(scroll_x, line_y)
+
 
 class CommandInput(Input):
     BINDINGS = [
         Binding("tab", "complete", show=False, priority=True),
         Binding("up", "history(-1)", show=False),
         Binding("down", "history(1)", show=False),
+        Binding("ctrl+shift+c", "copy_selection", show=False, priority=True),
         Binding("ctrl+c", "interrupt", show=False, priority=True),
         Binding("ctrl+d", "eof", show=False, priority=True),
         Binding("ctrl+l", "clear_screen", show=False),
@@ -86,8 +119,21 @@ class CommandInput(Input):
     def action_history(self, delta: int) -> None:
         self.pane.history(delta)
 
+    def _copy_selection(self) -> bool:
+        text = self.screen.get_selected_text()
+        if not text:
+            return False
+        self.app.copy_to_clipboard(text)
+        self.screen.clear_selection()
+        return True
+
+    def action_copy_selection(self) -> None:
+        self._copy_selection()
+
     def action_interrupt(self) -> None:
-        self.pane.interrupt()
+        # ctrl+c also copies when text is selected, like in Windows Terminal
+        if not self._copy_selection():
+            self.pane.interrupt()
 
     def action_eof(self) -> None:
         if self.value:
@@ -137,6 +183,7 @@ class TerminalPane(Vertical):
         self.pending_prompt = None
         self.closed = False
         self.tutorial_follow = False  # this pane runs 'tutorial -f'
+        self.watching = False         # this pane runs 'contracts -f'
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(classes="term-scroll"):
@@ -266,6 +313,13 @@ class TerminalPane(Vertical):
 
     def on_click(self, event: events.Click) -> None:
         self.cmd.focus()
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        # right click pastes the last copied text at the prompt
+        if event.button == 3 and self.app.clipboard:
+            self.cmd.focus()
+            self.cmd.insert_text_at_cursor(self.app.clipboard.replace("\n", " "))
+            event.stop()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.stop()
@@ -522,6 +576,11 @@ class GameScreen(Screen):
         self.active = None
         self.set_active(self.panes[0])
 
+    def on_text_selected(self, event: events.TextSelected) -> None:
+        # keep typing after a selection; copying is ctrl+shift+c (or ctrl+c)
+        if self.active is not None and not self.active.closed:
+            self.active.cmd.focus()
+
     def action_new_pane(self) -> None:
         self.add_pane()
 
@@ -571,9 +630,10 @@ class GameScreen(Screen):
                   "achievement": "★ "}.get(style, "")
         target = self.active
         guide = any(p.tutorial_follow for p in self.panes)
-        if target is not None and target.tutorial_follow:
-            # the guide pane redraws itself; messages go where the player works
-            target = next((p for p in self.panes if not p.tutorial_follow), None)
+        if target is not None and (target.tutorial_follow or target.watching):
+            # panels redraw themselves; messages go where the player works
+            target = next((p for p in self.panes
+                           if not p.tutorial_follow and not p.watching), None)
         if style == "tutorial" and guide:
             text = text.split("\n", 1)[0]       # the guide pane shows the details
         if target is not None and target.is_mounted:
@@ -646,4 +706,6 @@ class GameScreen(Screen):
         if objective:
             t.append(f"  » {objective}", "bold yellow")
         t.append(f"   {clock.fmt_status(s.minutes)}", "dim")
-        self.query_one("#status", Static).update(t)
+        # the screen may be tearing down between timer ticks
+        for bar in self.query("#status").results(Static):
+            bar.update(t)

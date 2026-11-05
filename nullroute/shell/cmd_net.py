@@ -323,7 +323,7 @@ async def c_nmap(ctx: Ctx) -> int:
             ctx.write(f"All {scanned} scanned ports on {node.hostname} ({node.ip}) are in ignored states.")
             ctx.write(f"Not shown: {scanned} filtered tcp ports (no-response)")
             ctx.write("(something - a firewall, or ICE - drops every probe. Try: probe "
-                      f"{node.short})", "dim")
+                      f"{ctx.game.world.ref(node)})", "dim")
             continue
         closed = scanned - len(svcs)
         if closed > 0:
