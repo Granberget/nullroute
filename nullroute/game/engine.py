@@ -294,6 +294,16 @@ class Game:
         node.check_at = 0.0
         self.flag(f"breach:{node.hostname}")
 
+    def node_credentials(self, node: Node) -> tuple[str, str]:
+        """The one valid (login, password) pair hydra can recover for a node."""
+        from . import creds
+        return creds.credentials_for(self.world, node)
+
+    def brute_noise(self, node: Node, hops: int) -> None:
+        """A brute-force is loud: it leaves a heavier footprint than a breach."""
+        node.footprint = min(100.0, node.footprint + 35 + 10 * node.sec)
+        node.footprint_hops = hops
+
     def scrub_seconds(self, node: Node) -> float:
         return max(2.0, node.footprint / 10.0 / (1 if self.state.sw["scrub"] < 2 else 2))
 

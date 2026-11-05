@@ -80,6 +80,34 @@ as a strike.
 * `scrub` (run while connected) erases your footprint on that node.
 * Long routes make footprints much harder to follow, even if you forget.
 """,
+    "Brute-forcing logins": """\
+# Brute-forcing logins
+
+`hydra` is a parallelised login cracker. It throws a wordlist of passwords
+at a service until one of them logs in, then saves what it found to
+`~/loot/`. Buy a licence in the Store and install it with apt:
+
+    sudo apt update && sudo apt install hydra
+
+That also drops wordlists into `/usr/share/wordlists/` (`common.txt`,
+`users.txt`). Then point it at a target:
+
+    hydra -l admin -P /usr/share/wordlists/common.txt www.acme.corp ssh
+    hydra -L /usr/share/wordlists/users.txt -P /usr/share/wordlists/common.txt ssh://core.acme.corp
+
+* `-l USER` tries one login; `-L FILE` tries a whole list of logins.
+* `-p PASS` tries one password; `-P FILE` reads a wordlist.
+* `-f` stops at the first login that works.
+
+**The port has to be open.** Live ICE filters the port, so hydra can't
+even connect - run `breach` first, then brute-force. A brute-force is as
+loud as a breach: the node traces you and you leave a footprint, so route
+through relays and `scrub` when you're done.
+
+A better wordlist cracks more. The shipped `common.txt` finds anything;
+a small list may miss. Higher hydra versions add more service modules
+(telnet, http-form, mysql, ...) and crack faster.
+""",
     "Contracts": """\
 # Contracts
 
@@ -170,7 +198,7 @@ This game runs a real-ish Linux shell, so you can learn a lot by playing.
 | `nano file` | edit a text file |
 | `ssh node`, `exit` | connect / disconnect |
 | `scp src dst` | copy between nodes (`host:path`) |
-| `probe`, `breach`, `scrub` | runner tools |
+| `probe`, `breach`, `hydra`, `scrub` | runner tools |
 | `route`, `map` | bounce route and network map |
 | `mail`, `contracts`, `status` | your stuff |
 | `sleep 2h` | let time pass (on your gateway) |

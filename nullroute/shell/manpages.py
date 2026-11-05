@@ -385,6 +385,17 @@ breach www.acme.corp
 probe core.acme.corp
     what protects this node, and can I break it?
 """,
+    "hydra": """
+hydra -l admin -P /usr/share/wordlists/common.txt www.acme.corp ssh
+    try the login 'admin' against ssh with a whole password list
+hydra -L /usr/share/wordlists/users.txt -P /usr/share/wordlists/common.txt ssh://www.acme.corp
+    try many logins too (service://host form)
+hydra -l root -p hunter2 www.acme.corp ssh
+    try a single login/password guess
+hydra -f -L users.txt -P common.txt www.acme.corp ssh
+    stop at the first login that works
+    (breach the node first - a filtered port can't be brute-forced)
+""",
     "route": """
 route add osaka
     add a relay to your bounce route
@@ -412,4 +423,6 @@ SEE_ALSO: dict[str, list[str]] = {
     "ps": ["top", "kill", "pgrep"], "kill": ["ps", "jobs", "killall"], "jobs": ["fg", "bg", "kill"],
     "ping": ["traceroute", "host"], "host": ["dig", "nslookup"], "dig": ["host", "nslookup"],
     "traceroute": ["ping", "route"], "tee": ["sudo"], "nano": ["cat", "less"],
+    "hydra": ["breach", "probe", "nmap", "scrub"], "breach": ["probe", "hydra", "ssh"],
+    "nmap": ["hydra", "probe", "ping"],
 }

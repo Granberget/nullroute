@@ -642,6 +642,10 @@ async def _do_install(ctx: Ctx, new: list[str], up: list[str], yes: bool, cmdlin
         fs.put(f"/usr/bin/{name}", "\x7fELF", size=pkg.size_kb * 1024, binary=True, mode=0o755,
                mtime=ctx.game.now)
         ctx.write(f"Setting up {name} ({ver}) ...")
+        if name == "hydra":
+            from ..game import creds
+            creds.provision(fs, ctx.game.now)
+            ctx.write(f"Wordlists installed in {creds.WORDLIST_DIR}/ (common.txt, users.txt).", "dim")
         ctx.game.flag(f"installed:{name}")
     if any(P.PACKAGES[n].section != "games" for n in new + up):
         ctx.write("Processing triggers for man-db (2.12.0-4) ...")

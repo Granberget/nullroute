@@ -174,6 +174,9 @@ def prepare_gateway(state) -> None:
             fs.put(path, "\x7fELF", size=pkg.size_kb * 1024, binary=True, mode=0o755, mtime=now)
         elif not is_installed(state, name) and fs.get(path) is not None:
             del fs.get("/usr/bin").children[name]
+    if is_installed(state, "hydra"):
+        from . import creds
+        creds.provision(fs, now)
 
 
 def _relays(w: World) -> None:

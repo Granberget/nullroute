@@ -1291,6 +1291,246 @@ async def c_breach(ctx: Ctx) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------- hydra
+HYDRA_PORTS = {
+    "ssh": 22, "ftp": 21, "telnet": 23, "smtp": 25, "http-get": 80,
+    "http-head": 80, "http-post-form": 80, "https-get": 443, "mysql": 3306,
+    "postgres": 5432, "postgresql": 5432, "rdp": 3389, "vnc": 5900,
+    "rsync": 873, "smb": 445,
+}
+# the minimum hydra licence that unlocks each service module
+HYDRA_LEVEL = {
+    "ssh": 1, "ftp": 1,
+    "telnet": 2, "smtp": 2, "http-get": 2, "http-head": 2, "http-post-form": 2,
+    "https-get": 2,
+    "mysql": 3, "postgres": 3, "postgresql": 3, "rdp": 3, "vnc": 3,
+    "rsync": 3, "smb": 3,
+}
+HYDRA_TASKS = {1: 16, 2: 32, 3: 64}
+HYDRA_MULT = {1: 1.0, 2: 2.0, 3: 4.0}
+
+
+def _hydra_list(ctx: Ctx, single: str | None, path: str | None, what: str) -> list[str] | None:
+    """Resolve a login/password source: a single value, or a wordlist file."""
+    if single is not None:
+        return [single]
+    node = ctx.fs.get(ctx.abspath(path))
+    if node is None or node.is_dir:
+        ctx.write(f"[ERROR] File for {what} not found: {path}", "error")
+        return None
+    out: list[str] = []
+    for line in node.content.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            out.append(line)
+    return list(dict.fromkeys(out))
+
+
+@cmd("hydra", "brute-force a login over the network", "hydra [-l USER|-L FILE] [-P FILE|-p PASS] [-s PORT] [-t N] [-f] [-o FILE] TARGET [SERVICE]",
+     "A parallelised login cracker (a fictional THC-hydra). It throws a wordlist\n"
+     "of passwords at a service until one logs in, then saves the credentials to\n"
+     "~/loot/.  Licensed in the agency store, installed with apt.\n\n"
+     "  -l USER / -L FILE   one login, or a file of logins (one per line)\n"
+     "  -p PASS / -P FILE   one password, or a wordlist file\n"
+     "  -s PORT             service port (default depends on the service)\n"
+     "  -t N                parallel tasks (default by hydra version)\n"
+     "  -f                  stop at the first login found\n"
+     "  -o FILE             also write the result to FILE\n"
+     "Give the target as  www.acme.corp ssh  or  ssh://www.acme.corp.\n"
+     "Wordlists live in /usr/share/wordlists/ (common.txt, users.txt).\n\n"
+     "It is as loud as a breach: the node starts tracing you and you leave a\n"
+     "footprint, so route through relays and scrub afterwards. The port must be\n"
+     "open first - break the ICE with 'breach' before you brute-force it.",
+     group="network")
+async def c_hydra(ctx: Ctx) -> int:
+    args = ctx.args
+    first_only = False
+    pos: list[str] = []
+    value = {"-l": "login", "-L": "login_file", "-p": "pw", "-P": "pw_file",
+             "-s": "port", "-t": "tasks", "-o": "outfile"}
+    got = {"login": None, "login_file": None, "pw": None, "pw_file": None,
+           "port": None, "tasks": None, "outfile": None}
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in value:
+            if i + 1 >= len(args):
+                ctx.write(f"[ERROR] option {a} requires an argument", "error")
+                return 1
+            got[value[a]] = args[i + 1]
+            i += 2
+            continue
+        if a in ("-f", "-F"):
+            first_only = True
+        elif a.startswith("-") and len(a) > 1:
+            pass  # tolerate the many flags real hydra has (-V, -I, -u, ...)
+        else:
+            pos.append(a)
+        i += 1
+    login, login_file = got["login"], got["login_file"]
+    pw, pw_file = got["pw"], got["pw_file"]
+    port_arg, tasks_arg, outfile = got["port"], got["tasks"], got["outfile"]
+
+    # ---- target and service
+    service = target = None
+    for p in pos:
+        if "://" in p:
+            service, target = p.split("://", 1)
+    plain = [p for p in pos if "://" not in p]
+    if target is None and plain:
+        target = plain[0]
+        if len(plain) >= 2 and service is None:
+            service = plain[1]
+    if target is None:
+        ctx.write("Syntax: hydra [-l USER|-L FILE] [-p PASS|-P FILE] TARGET SERVICE", None)
+        ctx.write("Example: hydra -l admin -P /usr/share/wordlists/common.txt www.acme.corp ssh")
+        return 1
+    if ":" in target and port_arg is None:
+        target, _, port_arg = target.partition(":")
+    service = (service or "ssh").lower()
+
+    # ---- credential sources
+    if login is not None and login_file is not None:
+        ctx.write("[ERROR] use either -l or -L, not both", "error")
+        return 1
+    if pw is not None and pw_file is not None:
+        ctx.write("[ERROR] use either -p or -P, not both", "error")
+        return 1
+    if login is None and login_file is None:
+        ctx.write("[ERROR] you must supply a login, e.g. -l admin  or  -L users.txt", "error")
+        return 255
+    if pw is None and pw_file is None:
+        ctx.write("[ERROR] you must supply passwords, e.g. -P /usr/share/wordlists/common.txt", "error")
+        return 255
+
+    # ---- service module and hydra version
+    level = ctx.game.state.sw.get("hydra", 1)
+    if service not in HYDRA_PORTS:
+        ctx.write(f"[ERROR] unknown service module: {service}", "error")
+        ctx.write("  Known: " + ", ".join(sorted(set(HYDRA_PORTS))), "dim")
+        return 1
+    if level < HYDRA_LEVEL[service]:
+        ctx.write(f"[ERROR] the {service} module needs hydra v{HYDRA_LEVEL[service]} "
+                  f"(you have v{level}) - upgrade in the agency store.", "error")
+        return 1
+    try:
+        port = int(port_arg) if port_arg is not None else HYDRA_PORTS[service]
+    except ValueError:
+        ctx.write(f"[ERROR] invalid port: {port_arg}", "error")
+        return 1
+
+    # ---- resolve the target and the route to it
+    try:
+        node, path = _reach(ctx, target)
+    except FSError as e:
+        ctx.err(str(e))
+        return 1
+    if node.kind == "gateway":
+        ctx.err("that's your own gateway.")
+        return 1
+    if node.kind in ("relay", "agency", "drop"):
+        ctx.write(f"[ERROR] {node.hostname} runs no login service worth cracking.", "error")
+        return 1
+
+    stamp = clock.to_dt(ctx.game.now).strftime("%Y-%m-%d %H:%M:%S")
+    ctx.write("Hydra v9.5nr (c) Blackrelay - for authorised runs on your own contracts only.")
+    ctx.write("")
+    ctx.write(f"Hydra starting at {stamp}")
+
+    # the port is filtered until the ICE is down
+    if not node.is_open(ctx.game.now):
+        ctx.write(f"[ERROR] could not connect to {service}://{node.hostname}:{port} - "
+                  "Connection refused", "error")
+        ctx.write(f"  The port is filtered by live ICE. Breach it first: breach {node.short}", "dim")
+        return 1
+
+    logins = _hydra_list(ctx, login, login_file, "logins")
+    if logins is None:
+        return 1
+    passwords = _hydra_list(ctx, pw, pw_file, "passwords")
+    if passwords is None:
+        return 1
+    if not logins or not passwords:
+        ctx.write("[ERROR] empty login or password list", "error")
+        return 1
+
+    combos = len(logins) * len(passwords)
+    real_login, real_pw = ctx.game.node_credentials(node)
+    found = real_login in logins and real_pw in passwords
+    idx = (logins.index(real_login) * len(passwords) + passwords.index(real_pw)) if found else combos
+
+    # ---- timing
+    tasks = HYDRA_TASKS.get(level, 16)
+    if tasks_arg is not None:
+        try:
+            tasks = max(1, min(64, int(tasks_arg)))
+        except ValueError:
+            ctx.write(f"[ERROR] invalid task count: {tasks_arg}", "error")
+            return 1
+    cpu = store.CPU_SPEED[ctx.game.state.hw["cpu"]]
+    rate = max(4.0, tasks * 1.6 * cpu * HYDRA_MULT.get(level, 1.0))   # simulated tries/sec
+    tries_per_min = rate * 60
+    full_secs = max(1.5, min(22.0, combos / rate * 0.12))
+    hit_frac = (idx + 1) / combos if found else 1.0
+    run_secs = max(1.2, min(24.0, full_secs * (hit_frac if first_only else 1.0)))
+
+    hops = len(path) - 2
+    per_task = max(1, combos // max(1, tasks))
+    ctx.write(f"[DATA] max {tasks} tasks per 1 server, overall {tasks} tasks, {combos} login "
+              f"tries (l:{len(logins)}/p:{len(passwords)}), ~{per_task} tries per task")
+    ctx.write(f"[DATA] attacking {service}://{node.hostname}:{port}/")
+    if hops:
+        ctx.write(f"  (routing through {hops} relay hop{'s' if hops != 1 else ''})", "dim")
+
+    def render(frac: float) -> str:
+        done = int(combos * frac)
+        return (f"[STATUS] {tries_per_min:,.2f} tries/min, {done} of {combos} tries, "
+                f"{tasks} active {bar(frac, 16)}")
+
+    conn = ctx.game.open_conn(Conn(node.hostname, path, "hydra"))
+    try:
+        ctx.game.start_trace(node, "brute-force login flood")
+        await ctx.sleep(run_secs, render=render)
+        ctx.game.brute_noise(node, hops)       # footprint set before close_conn schedules a review
+    finally:
+        ctx.game.close_conn(conn)
+
+    end = clock.to_dt(ctx.game.now).strftime("%Y-%m-%d %H:%M:%S")
+    if found:
+        ctx.write(f"[{port}][{service}] host: {node.hostname}   login: {real_login}   "
+                  f"password: {real_pw}", "good")
+        ctx.write("1 of 1 target successfully completed, 1 valid password found")
+        block = (f"# hydra loot - {node.hostname} ({node.ip}) - {end}\n"
+                 f"{service}://{node.hostname}:{port}  {real_login}:{real_pw}\n")
+        gw = ctx.game.world.nodes[GATEWAY].fs
+        lootdir = f"{ctx.game.state.home}/loot"
+        d = gw.mkdir_p(lootdir, mtime=ctx.game.now)
+        d.owner = d.group = ctx.game.state.handle
+        lootpath = f"{lootdir}/{node.short}.txt"
+        existing = gw.get(lootpath)
+        if existing is not None and not existing.is_dir:
+            existing.content += block
+            existing.mtime = ctx.game.now
+        else:
+            f = gw.put(lootpath, block, mtime=ctx.game.now)
+            f.owner = f.group = ctx.game.state.handle
+        ctx.write(f"  Credentials saved to ~/loot/{node.short}.txt", "good")
+        if outfile:
+            try:
+                parent, name = ctx.parent_for_write(outfile)
+                parent.add(ctx.new_file(name, block))
+            except FSError as e:
+                ctx.err(str(e))
+        ctx.game.award("brute_force")
+        ctx.game.flag(f"hydra:{node.hostname}")
+    else:
+        ctx.write("0 of 1 target completed, 0 valid passwords found", "warn")
+        ctx.write("  No password in your list logged in. Try a bigger wordlist "
+                  "(/usr/share/wordlists/common.txt), or check the login with -L users.txt.", "dim")
+    ctx.write(f"Hydra finished at {end}")
+    return 0 if found else 1
+
+
 @cmd("scrub", "remove your footprint from this node", "scrub",
      "Run on a node you are connected to. Erases the evidence of your visit\n"
      "so the owner has nothing to follow when they review the node later.", group="game")

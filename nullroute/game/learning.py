@@ -22,6 +22,7 @@ ACHIEVEMENTS: dict[str, tuple[str, str]] = {
     "traceroute": ("Pathfinder", "Trace the path to a host with traceroute"),
     "dns": ("Name resolver", "Look up a host name with host, dig or nslookup"),
     "port_scan": ("Port scanner", "Scan a host's ports with nmap (sudo apt install nmap)"),
+    "brute_force": ("Hydra", "Crack a login with hydra -P wordlist"),
     "mail_attach": ("Special delivery", "Send a mail with an attachment"),
     "split": ("Multiplexer", "Work in two terminals at once (Ctrl+N or split)"),
     "grep_r": ("Needle in a haystack", "Search a directory tree with grep -r"),

@@ -25,6 +25,7 @@ PACKAGES: dict[str, Pkg] = {
     "decrypt": Pkg("decrypt", "breach module for CIPHER layers", True, size_kb=1900, section="net"),
     "spoof": Pkg("spoof", "breach module for GATEKEEPER layers", True, size_kb=2100, section="net"),
     "scrub": Pkg("scrub", "removes your footprint from a node", True, size_kb=640, section="net"),
+    "hydra": Pkg("hydra", "parallelised network login brute-forcer", True, size_kb=2400, section="net"),
     "tracemon": Pkg("tracemon", "status bar trace monitor", True, size_kb=310, section="net"),
     "cowsay": Pkg("cowsay", "configurable talking cow", version="3.03+dfsg2-8", size_kb=93),
     "fortune": Pkg("fortune", "provides fortune cookies on demand", version="1:1.99.1-7.3", size_kb=88),
@@ -37,7 +38,8 @@ PACKAGES: dict[str, Pkg] = {
 
 # commands that only exist once their package is installed
 COMMAND_PKG = {"probe": "probe", "scrub": "scrub", "cowsay": "cowsay", "nmap": "nmap",
-               "fortune": "fortune", "figlet": "figlet", "sl": "sl", "htop": "htop"}
+               "hydra": "hydra", "fortune": "fortune", "figlet": "figlet", "sl": "sl",
+               "htop": "htop"}
 
 REPO = "https://repo.blackrelay.net/debian"
 

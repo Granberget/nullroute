@@ -511,7 +511,7 @@ class Shell:
             return self._apply(prefix, word, cands, " ")
         parts = head.split()
         cmd = parts[1] if parts and parts[0] == "sudo" and len(parts) > 1 else (parts[0] if parts else "")
-        hostish = cmd in ("ssh", "breach", "probe", "ping", "traceroute", "host",
+        hostish = cmd in ("ssh", "breach", "probe", "hydra", "ping", "traceroute", "host",
                           "nslookup", "dig") or (cmd == "route" and len(parts) >= 2)
         cands: list[str] = []
         if cmd in ("apt", "apt-get") and len(parts) >= 2:
