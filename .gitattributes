@@ -1,0 +1,7 @@
+# Normalise line endings in the repository
+* text=auto
+
+# Shell scripts must keep LF or they won't run on Linux/macOS
+*.sh text eol=lf
+# Batch files want CRLF on Windows
+*.bat text eol=crlf

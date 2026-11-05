@@ -1,0 +1,25 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tests
+.pytest_cache/
+screenshots/
+
+# Save games (normally in ~/.nullroute, but just in case)
+*.sav
+*.tmp
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/settings.local.json

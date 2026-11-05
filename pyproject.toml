@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nullroute"
+version = "0.2.0"
+description = "NULLROUTE - a terminal hacking game with a real shell and fictional nodes"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["textual>=1.0"]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
+[project.scripts]
+nullroute = "nullroute.ui.app:main"
+
+[tool.setuptools.packages.find]
+include = ["nullroute*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
