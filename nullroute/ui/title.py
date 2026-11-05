@@ -11,6 +11,7 @@ from textual.widgets.option_list import Option
 
 from ..game import state as S
 from ..game.engine import Game
+from .terminal import ConfirmScreen
 
 LOGO = r"""
  _   _ _   _ _     _     ____   ___  _   _ _____ _____
@@ -35,7 +36,8 @@ class TitleScreen(Screen):
     #keys { color: $text-muted; margin-top: 1; }
     #title-msg { color: $error; height: auto; }
     """
-    BINDINGS = [Binding("escape", "back", show=False)]
+    BINDINGS = [Binding("escape", "back", show=False),
+                Binding("delete,d", "delete_runner", show=False)]
 
     def __init__(self):
         super().__init__()
@@ -45,7 +47,7 @@ class TitleScreen(Screen):
     def compose(self) -> ComposeResult:
         with Vertical(id="title-box"):
             yield Static(LOGO, id="logo")
-            yield Static("a terminal hacking game  -  fictional nodes, real shell", id="tagline")
+            yield Static("The shell is yours - leave no trace", id="tagline")
             yield OptionList(id="menu")
             with Vertical(id="new-form", classes="form"):
                 yield Label("New runner - choose a handle:")
@@ -73,12 +75,15 @@ class TitleScreen(Screen):
         menu.add_option(Option("✚  New game", id="new"))
         if saves:
             menu.add_option(Option("⚿  Reset a password", id="reset"))
+            menu.add_option(Option("⌫  Delete a runner", id="delete"))
         menu.add_option(Option("✖  Quit", id="quit"))
         menu.display = True
         for f in self.query(".form"):
             f.display = False
         self.query_one("#title-msg", Static).update("")
-        self.query_one("#keys", Static).update("↑/↓ choose   Enter select   Esc back")
+        self.query_one("#keys", Static).update(
+            "↑/↓ choose   Enter select   Del/d delete runner   Esc back" if saves
+            else "↑/↓ choose   Enter select   Esc back")
         menu.highlighted = 0
         if highlight:
             for i in range(menu.option_count):
@@ -95,6 +100,50 @@ class TitleScreen(Screen):
         menu.highlighted = 0
         menu.focus()
         self.query_one("#keys", Static).update("Whose password?   ↑/↓ choose   Enter select   Esc back")
+
+    def show_delete_choice(self) -> None:
+        self.mode = "delete-pick"
+        menu = self.query_one("#menu", OptionList)
+        menu.clear_options()
+        for name in S.list_saves():
+            menu.add_option(Option(f"⌫  {name}", id=f"kill:{name}"))
+        menu.highlighted = 0
+        menu.focus()
+        self.query_one("#keys", Static).update("Delete which runner?   ↑/↓ choose   Enter/Del delete   Esc back")
+
+    def action_delete_runner(self) -> None:
+        """Delete the highlighted saved runner (menu or delete list)."""
+        if self.mode not in ("menu", "delete-pick"):
+            return
+        menu = self.query_one("#menu", OptionList)
+        if menu.highlighted is None:
+            return
+        oid = menu.get_option_at_index(menu.highlighted).id or ""
+        if oid.startswith(("load:", "kill:")):
+            self.confirm_delete(oid[5:])
+
+    def confirm_delete(self, handle: str) -> None:
+        from_pick = self.mode == "delete-pick"
+
+        def done(ok: bool | None) -> None:
+            msg = self.query_one("#title-msg", Static)
+            if not ok:
+                if from_pick:
+                    self.show_delete_choice()
+                else:
+                    self.show_menu(highlight=f"load:{handle}")
+                msg.update(f"Kept {handle}.")
+                return
+            try:
+                S.delete_save(handle)
+            except OSError as e:
+                self.show_menu()
+                self.query_one("#title-msg", Static).update(f"Could not delete {handle}: {e}")
+                return
+            self.show_menu()
+            self.query_one("#title-msg", Static).update(f"Runner {handle} deleted.")
+
+        self.app.push_screen(ConfirmScreen(f"Delete runner {handle}? This cannot be undone."), done)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         oid = event.option.id or ""
@@ -114,6 +163,10 @@ class TitleScreen(Screen):
             self.query_one("#handle", Input).focus()
         elif oid == "reset":
             self.show_reset_choice()
+        elif oid == "delete":
+            self.show_delete_choice()
+        elif oid.startswith("kill:"):
+            self.confirm_delete(oid[5:])
         elif oid.startswith("pick:"):
             self.mode = "reset"
             self.reset_handle = oid[5:]

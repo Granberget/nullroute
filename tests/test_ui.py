@@ -159,3 +159,97 @@ async def test_password_reset_from_menu(tmp_path, monkeypatch):
         await type_line(pilot, "fresh")
         await type_line(pilot, "fresh")
         assert S.load("zed").password == "fresh"
+
+
+@pytest.mark.asyncio
+async def test_tutorial_follow_pane(tmp_path, monkeypatch):
+    monkeypatch.setenv("NULLROUTE_HOME", str(tmp_path))
+    from textual.widgets import Static
+    app = NullrouteApp()
+    async with app.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause(0.2)
+        await type_line(pilot, "neo")
+        await type_line(pilot, "secret")
+        gs = app.screen
+        status = str(gs.query_one("#status", Static).render())
+        assert "1/13: Split the screen" in status
+        await pilot.press("ctrl+n")
+        await pilot.pause(0.3)
+        guide = app.term
+        await type_line(pilot, "tutorial -f")
+        await pilot.pause(0.5)
+        assert guide.tutorial_follow
+        assert "TUTORIAL 2/13: Read your mail" in log_text(app)
+        assert "2/13: Read your mail" in str(gs.query_one("#status", Static).render())
+        await pilot.press("alt+left")                  # back to the work terminal
+        await pilot.pause(0.2)
+        work = app.term
+        assert work is not guide
+        await type_line(pilot, "mail")
+        await pilot.pause(0.3)
+        await pilot.press("escape")
+        await pilot.pause(0.6)
+        work_text = log_text(app)
+        assert "Objective done: Read your mail." in work_text
+        assert "Contracts tab" not in work_text        # details only in the guide pane
+        guide_text = "\n".join(line.text for line in guide.log_w.lines)
+        assert "TUTORIAL 3/13: Visit the agency" in guide_text
+        assert "TUTORIAL 2/13" not in guide_text       # redrawn, not appended
+        SHOTS.mkdir(exist_ok=True)
+        app.save_screenshot(str(SHOTS / "13_tutorial_follow.svg"))
+
+
+@pytest.mark.asyncio
+async def test_delete_runner_from_menu(tmp_path, monkeypatch):
+    monkeypatch.setenv("NULLROUTE_HOME", str(tmp_path))
+    from nullroute.game import state as S
+    from nullroute.ui.terminal import ConfirmScreen
+    from nullroute.ui.title import TitleScreen
+    S.save(S.new_state("amy", seed=1, password="pw"))
+    S.save(S.new_state("bob", seed=2, password="pw"))
+    app = NullrouteApp()
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        assert "Del/d delete" in str(app.screen.query_one("#keys").render())
+        # menu: Continue as amy, Continue as bob, ... - Del on amy, then cancel
+        await pilot.press("delete")
+        await pilot.pause(0.2)
+        assert isinstance(app.screen, ConfirmScreen)
+        assert "Delete runner amy? This cannot be undone." in app.screen.question
+        await pilot.press("escape")
+        await pilot.pause(0.2)
+        assert isinstance(app.screen, TitleScreen)
+        assert S.list_saves() == ["amy", "bob"]
+        # "n" also cancels
+        await pilot.press("d")
+        await pilot.pause(0.2)
+        await pilot.press("n")
+        await pilot.pause(0.2)
+        assert S.list_saves() == ["amy", "bob"]
+        # confirm with y
+        await pilot.press("d")
+        await pilot.pause(0.2)
+        await pilot.press("y")
+        await pilot.pause(0.2)
+        assert S.list_saves() == ["bob"]
+        ids = [app.screen.query_one("#menu").get_option_at_index(i).id
+               for i in range(app.screen.query_one("#menu").option_count)]
+        assert ids == ["load:bob", "new", "reset", "delete", "quit"]
+        # delete the last runner through the "Delete a runner" menu entry
+        await pilot.press("down", "down", "down", "enter")   # -> Delete a runner
+        await pilot.pause(0.2)
+        await pilot.press("enter")                          # pick bob
+        await pilot.pause(0.2)
+        assert isinstance(app.screen, ConfirmScreen)
+        await pilot.press("y")
+        await pilot.pause(0.2)
+        assert S.list_saves() == []
+        menu = app.screen.query_one("#menu")
+        ids = [menu.get_option_at_index(i).id for i in range(menu.option_count)]
+        assert ids == ["new", "quit"]
+        # Del on a non-runner entry does nothing
+        await pilot.press("delete")
+        await pilot.pause(0.2)
+        assert isinstance(app.screen, TitleScreen)

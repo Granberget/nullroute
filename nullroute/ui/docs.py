@@ -18,7 +18,9 @@ nodes, and Blackrelay passes the work to you.
 5. `ssh <node>` and do the job with ordinary commands.
 6. `scrub` to erase your footprint, then `exit`.
 
-Type `tutorial` in your terminal for a guided first job.
+Type `tutorial` in your terminal for a guided first job. Even better: press
+**Ctrl+N** for a second terminal and run `tutorial -f` there - the guide then
+stays on screen and updates by itself while you work in the other one.
 """,
     "ICE and breaching": """\
 # ICE and breaching

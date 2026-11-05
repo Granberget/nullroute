@@ -1655,21 +1655,53 @@ async def c_contracts(ctx: Ctx) -> int:
     return 0
 
 
-@cmd("tutorial", "show the current tutorial objective", "tutorial [skip]", group="game")
+@cmd("tutorial", "show the current tutorial objective", "tutorial [-f | skip]",
+     "Shows what to do next in the training job.\n"
+     "-f   follow: keep the guide on screen and update it by itself whenever\n"
+     "     you finish a step. Best in a terminal of its own - press Ctrl+N\n"
+     "     for a second terminal and run 'tutorial -f' there. Ctrl+C stops it.\n"
+     "skip turn the tutorial off.", group="game")
 async def c_tutorial(ctx: Ctx) -> int:
     s = ctx.game.state
     if ctx.args and ctx.args[0] == "skip":
         s.tutorial_done = True
         ctx.write("Tutorial skipped. 'help' lists all commands.")
         return 0
+    if ctx.args and ctx.args[0] in ("-f", "--follow"):
+        return await _tutorial_follow(ctx)
     step = tutorial.current(ctx.game)
     if step is None:
         ctx.write("Tutorial complete. Contracts are on the agency BBS (ssh blackrelay.net).")
         return 0
-    ctx.write(f"Tutorial {s.tutorial_step + 1}/{len(tutorial.STEPS)}: {step.title}", "title")
-    for line in step.text.splitlines():
-        ctx.write("  " + line)
+    ctx.write(f"Tutorial {tutorial.heading(ctx.game)}", "title")
+    ctx.write(tutorial.step_text(step))
+    ctx.write("Tip: Ctrl+N, then 'tutorial -f' in the new terminal keeps this on screen.", "dim")
     return 0
+
+
+async def _tutorial_follow(ctx: Ctx) -> int:
+    """'tutorial -f': redraw this terminal with the current step until done."""
+    if ctx.piped or ctx.background:
+        ctx.err("-f needs a terminal of its own (Ctrl+N opens one)")
+        return 1
+    ui = ctx.ui
+    ui.tutorial_follow = True
+    ctx.game.flag("tutorial_follow")
+    shown = None
+    try:
+        while True:
+            s = ctx.game.state
+            key = (s.tutorial_step, s.tutorial_done)
+            if key != shown:
+                shown = key
+                ui.clear()
+                for text, style in tutorial.render(ctx.game):
+                    ctx.write(text, style)
+                if tutorial.current(ctx.game) is None:
+                    return 0
+            await asyncio.sleep(0.25)
+    finally:
+        ui.tutorial_follow = False
 
 
 @cmd("status", "show your money, rating and gear", group="game")

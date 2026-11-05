@@ -13,7 +13,7 @@ from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Input, Label, RichLog, Static
 
-from ..game import clock, state as S
+from ..game import clock, state as S, tutorial
 from ..game.engine import MAX_STRIKES, Game
 from ..game.world import GATEWAY
 from ..shell.core import Shell
@@ -136,6 +136,7 @@ class TerminalPane(Vertical):
         self.cmd_task: asyncio.Task | None = None
         self.pending_prompt = None
         self.closed = False
+        self.tutorial_follow = False  # this pane runs 'tutorial -f'
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(classes="term-scroll"):
@@ -167,12 +168,19 @@ class TerminalPane(Vertical):
         self.write("")
         if self.welcome == "new":
             self.write(f"Gateway online. Welcome, {s.handle}.", "good")
-            self.write("You have new mail - type 'mail' to read it. 'tutorial' shows your next step.",
-                       "tutorial")
+            self.write("You have new mail.", "mail")
         else:
             self.write(f"Welcome back, {s.handle}. {clock.fmt_status(s.minutes)}", "good")
             if s.unread:
                 self.write(f"You have {s.unread} unread mail.", "mail")
+        if tutorial.current(self.game) is not None:
+            self.write(f"Tutorial {tutorial.heading(self.game)}", "title")
+            if s.tutorial_step == 0:
+                self.write("  Press Ctrl+N, then type  tutorial -f  in the new terminal: the guide "
+                           "stays on screen while you work in this one.", "tutorial")
+            else:
+                self.write("  'tutorial' shows the details - or Ctrl+N and 'tutorial -f' keeps "
+                           "them on screen.", "tutorial")
             if not s.password:
                 self.write("Your gateway has real users, sudo and apt now. Set a password for sudo "
                            "first: passwd", "tutorial")
@@ -561,8 +569,15 @@ class GameScreen(Screen):
     def _game_notify(self, text: str, style: str) -> None:
         prefix = {"alert": "!! ", "mail": "✉ ", "good": "✓ ", "tutorial": "» ",
                   "achievement": "★ "}.get(style, "")
-        if self.active is not None and self.active.is_mounted:
-            self.active.write(prefix + text, style)
+        target = self.active
+        guide = any(p.tutorial_follow for p in self.panes)
+        if target is not None and target.tutorial_follow:
+            # the guide pane redraws itself; messages go where the player works
+            target = next((p for p in self.panes if not p.tutorial_follow), None)
+        if style == "tutorial" and guide:
+            text = text.split("\n", 1)[0]       # the guide pane shows the details
+        if target is not None and target.is_mounted:
+            target.write(prefix + text, style)
         if style in ("alert", "mail", "good", "achievement") and self.app.screen is not self:
             self.app.notify(text, severity="error" if style == "alert" else "information")
 
@@ -627,5 +642,8 @@ class GameScreen(Screen):
             t.append(f"  footprint {int(node.footprint)}%", "magenta")
         if s.unread:
             t.append(f"  ✉ {s.unread}", "bold cyan")
+        objective = tutorial.heading(g)
+        if objective:
+            t.append(f"  » {objective}", "bold yellow")
         t.append(f"   {clock.fmt_status(s.minutes)}", "dim")
         self.query_one("#status", Static).update(t)

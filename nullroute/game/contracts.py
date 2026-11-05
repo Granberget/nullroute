@@ -78,7 +78,8 @@ def training_contract(now: float) -> Contract:
             "Steps:   probe the node, set up a route through a couple of\n"
             "         relays, breach it, ssh in, find the file, copy it home,\n"
             "         scrub your footprint, exit, then send the mail.\n\n"
-            "Type 'tutorial' at any time for the next step."),
+            "Type 'tutorial' at any time for the next step\n"
+            "(or 'tutorial -f' in a second terminal to keep it on screen)."),
         pay=1500, difficulty=1, deadline=now + 60 * 24 * 30, min_rating=0,
         tag="sandbox-payload", status="accepted", accepted_at=now,
         client="Vex", client_addr="vex@blackrelay.net")

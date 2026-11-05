@@ -63,6 +63,7 @@ class GameState:
     flags: set[str] = field(default_factory=set)
     tutorial_step: int = 0
     tutorial_done: bool = False
+    tutorial_rev: int = 1           # 1: step 0 'Split the screen' exists
     next_contract_at: float = 0.0
     counter: int = 0
     game_over: str = ""
@@ -127,6 +128,10 @@ _DEFAULTS = {
 
 def migrate(s: GameState) -> GameState:
     """Bring older saves up to date and make sure the gateway is set up."""
+    if "tutorial_rev" not in vars(s):    # saved before the 'Split the screen' step
+        if s.tutorial_step > 0:
+            s.tutorial_step += 1
+        s.tutorial_rev = 1
     for name, default in _DEFAULTS.items():
         if not hasattr(s, name):
             setattr(s, name, default() if callable(default) else default)

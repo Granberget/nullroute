@@ -55,7 +55,7 @@ class Game:
     def notify(self, text: str, style: str = "info") -> None:
         daemon = {"mail": "mail", "alert": "tracewatch", "tutorial": "tutorial",
                   "good": "blackrelay", "achievement": "achievements"}.get(style, "nullroute")
-        self.syslog(daemon, text)
+        self.syslog(daemon, text.split("\n", 1)[0])
         for cb in self.listeners:
             cb(text, style)
 
@@ -207,7 +207,9 @@ class Game:
             "Bounce through public relays to slow the trace down, and always\n"
             "scrub your footprint before you leave a node.\n\n"
             "I've set up a training job for you (contract T0). Type 'tutorial'\n"
-            "whenever you want to know what to do next.\n\n"
+            "whenever you want to know what to do next - or open a second\n"
+            "terminal with Ctrl+N and run 'tutorial -f' there to keep the guide\n"
+            "on screen while you work.\n\n"
             f"The agency BBS is at {AGENCY} - contracts, store and docs.\n\n"
             "New to Linux? Your gateway runs a real-ish shell. 'learn' has ten\n"
             "short lessons, 'man <command>' has examples for everything, and\n"
