@@ -39,7 +39,7 @@ PACKAGES: dict[str, Pkg] = {
 # commands that only exist once their package is installed
 COMMAND_PKG = {"probe": "probe", "scrub": "scrub", "cowsay": "cowsay", "nmap": "nmap",
                "hydra": "hydra", "fortune": "fortune", "figlet": "figlet", "sl": "sl",
-               "htop": "htop"}
+               "htop": "htop", "bypass": "bypass", "decrypt": "decrypt", "spoof": "spoof"}
 
 REPO = "https://repo.blackrelay.net/debian"
 

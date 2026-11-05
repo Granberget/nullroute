@@ -81,7 +81,9 @@ STEPS: list[Step] = [
          "system, so it needs root - that's what sudo is for:\n"
          "  sudo apt update            refresh the list of packages\n"
          "  sudo apt install decrypt   install it\n"
-         "sudo asks for YOUR password (the one you picked at the start).",
+         "sudo asks for YOUR password (the one you picked at the start).\n"
+         "decrypt is a breach module: you don't run it by hand, 'breach HOST'\n"
+         "loads it for every CIPHER layer. Type  decrypt  to check its version.",
          _flag("installed:decrypt")),
 ]
 

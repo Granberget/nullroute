@@ -70,6 +70,14 @@ def test_tutorial_flow(h):
     assert "Setting up decrypt" in out, out
     assert h.state.sw["decrypt"] == 1
     assert h.state.tutorial_done, h.state.tutorial_step
+    assert "decrypt v1" in h.run("decrypt")
+    assert "decrypt v1" in h.run("/usr/bin/decrypt")
+    assert h.run("which decrypt").strip() == "/usr/bin/decrypt"
+
+
+def test_breach_module_needs_install(h):
+    assert "can be installed" in h.run("spoof")
+    assert "bypass v1" in h.run("/bin/bypass")
 
 
 def test_tutorial_messages_carry_next_step(h):

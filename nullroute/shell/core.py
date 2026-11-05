@@ -13,6 +13,7 @@ from ..game.world import GATEWAY
 from .parser import ParseError, Pipeline, Word, parse, tokenize
 
 ROOT = Identity("root", {"root"})
+BIN_DIRS = {"/bin", "/usr/bin", "/usr/local/bin", "/sbin", "/usr/sbin"}
 
 
 class UI(Protocol):
@@ -428,6 +429,12 @@ class Shell:
                        frame: Frame | None = None) -> int:
         frame = frame or self.frame
         name = argv[0]
+        if "/" in name:                     # /usr/bin/decrypt -> decrypt
+            path = normpath(name, frame.cwd)
+            head, base = path.rsplit("/", 1)
+            if head in BIN_DIRS and base in self.commands:
+                name = base
+                argv = [base, *argv[1:]]
         spec = self.commands.get(name)
         if spec is None:
             errsink(self._not_found(name))

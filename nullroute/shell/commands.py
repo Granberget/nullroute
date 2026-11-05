@@ -1291,6 +1291,34 @@ async def c_breach(ctx: Ctx) -> int:
     return 0
 
 
+# Breach modules: installed with apt, loaded by `breach`. Running one directly
+# just reports its version and points at breach.
+BREACH_MODULES = {"bypass": "firewall", "decrypt": "cipher", "spoof": "gatekeeper"}
+
+
+def _module_cmd(prog: str, layer: str):
+    async def run(ctx: Ctx) -> int:
+        ver = ctx.game.state.sw.get(prog, 0)
+        top = store.max_strength(ver)
+        ctx.write(f"{prog} v{ver} - breach module for {layer.upper()} layers "
+                  f"(breaks strength {'any' if top >= 5 else f'1-{top}'})")
+        ctx.write("It is loaded automatically by breach. Use it like this:", "dim")
+        host = ctx.args[0] if ctx.args and not ctx.args[0].startswith("-") else "HOST"
+        ctx.write(f"  probe {host}     see which ICE layers the node has")
+        ctx.write(f"  breach {host}    break them all (uses bypass, decrypt and spoof)")
+        return 0 if not ctx.args or ctx.args[0] in ("-h", "--help", "-V", "--version") else 1
+    return run
+
+
+for _prog, _layer in BREACH_MODULES.items():
+    cmd(_prog, f"breach module for {_layer.upper()} layers", f"{_prog} [--version]",
+        f"{_prog} is a breach module. You don't run it by hand: 'breach HOST'\n"
+        f"loads it automatically for every {_layer.upper()} layer on the node.\n"
+        f"Running '{_prog}' on its own shows the installed version and what it can break.\n"
+        f"Higher versions (agency store, then sudo apt install {_prog}) break stronger layers.",
+        group="game")(_module_cmd(_prog, _layer))
+
+
 # ---------------------------------------------------------------------- hydra
 HYDRA_PORTS = {
     "ssh": 22, "ftp": 21, "telnet": 23, "smtp": 25, "http-get": 80,
